@@ -64,6 +64,7 @@ fig_week = px.line(
     markers=True,
     title=f"{selected_metric} by Week"
 )
+
 fig_week.update_layout(xaxis_title="Week", xaxis_tickangle=45)
 st.plotly_chart(fig_week)
 
