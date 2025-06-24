@@ -38,12 +38,14 @@ st.plotly_chart(px.bar(hourly_summary, x='Hour', y=['Total Sales', '# Transactio
 
 st.subheader("3. Heatmap: Day vs Hour (Sales)")
 fig1, ax1 = plt.subplots(figsize=(12, 6))
-sns.heatmap(day_hour.pivot('DayOfWeek', 'Hour', 'Total Sales'), cmap="YlGnBu", ax=ax1)
+pivot_sales = day_hour.pivot(index='DayOfWeek', columns='Hour', values='Total Sales').fillna(0)
+sns.heatmap(pivot_sales, cmap="YlGnBu", ax=ax1)
 st.pyplot(fig1)
 
 st.subheader("4. Heatmap: Day vs Hour (Transactions)")
 fig2, ax2 = plt.subplots(figsize=(12, 6))
-sns.heatmap(day_hour.pivot('DayOfWeek', 'Hour', '# Transactions'), cmap="Blues", ax=ax2)
+pivot_trans = day_hour.pivot(index='DayOfWeek', columns='Hour', values='# Transactions').fillna(0)
+sns.heatmap(pivot_trans, cmap="Blues", ax=ax2)
 st.pyplot(fig2)
 
 st.subheader("5. Recommendations")
