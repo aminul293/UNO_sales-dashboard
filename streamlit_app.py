@@ -12,7 +12,7 @@ df['DayOfWeek'] = df['Date'].dt.day_name()
 df['Year'] = df['Date'].dt.year
 df['Month'] = df['Date'].dt.month_name()
 
-# Create chronological weekly label
+# Create readable, sortable weekly label
 df['WeekStart'] = df['Date'] - pd.to_timedelta(df['Date'].dt.weekday, unit='D')
 df['WeekLabel'] = df['WeekStart'].dt.strftime("Week of %b %d")
 
@@ -52,7 +52,7 @@ monthly_summary = filtered_df.groupby(['Year', 'Month']).agg({selected_metric: '
 fig_month = px.bar(monthly_summary, x='Month', y=selected_metric, color='Year', barmode='group', title=f"{selected_metric} by Month")
 st.plotly_chart(fig_month)
 
-# Weekly Comparison (Chronologically Sorted)
+# Weekly Comparison (Chronologically Ordered)
 st.subheader(f"📅 Weekly {selected_metric} Comparison")
 weekly_summary = filtered_df.groupby(['Year', 'WeekStart', 'WeekLabel']).agg({selected_metric: 'sum'}).reset_index()
 weekly_summary = weekly_summary.sort_values('WeekStart')
@@ -72,6 +72,10 @@ st.subheader(f"📊 {selected_metric} by Day of Week")
 dow_summary = filtered_df.groupby('DayOfWeek').agg({selected_metric: 'sum'}).reindex(day_list).reset_index()
 fig_pie = px.pie(dow_summary, names='DayOfWeek', values=selected_metric, title=f"{selected_metric} Distribution by Day")
 st.plotly_chart(fig_pie)
+
+# Filtered Data Table
+st.subheader("📋 Filtered Data Table")
+st.dataframe(filtered_df[['Date', 'Hour', 'DayOfWeek', '# Transactions', 'Total Sales']])
 
 # Download Button
 st.download_button("📥 Download Filtered Data", data=filtered_df.to_csv(index=False), file_name="filtered_data.csv")
