@@ -73,9 +73,34 @@ dow_summary = filtered_df.groupby('DayOfWeek').agg({selected_metric: 'sum'}).rei
 fig_pie = px.pie(dow_summary, names='DayOfWeek', values=selected_metric, title=f"{selected_metric} Distribution by Day")
 st.plotly_chart(fig_pie)
 
-# Filtered Data Table
-st.subheader("📋 Filtered Data Table")
-st.dataframe(filtered_df[['Date', 'Hour', 'DayOfWeek', '# Transactions', 'Total Sales']])
+# Summary Table (Not raw data — summary metrics)
+st.subheader("📋 Summary of Filtered Data")
 
-# Download Button
+# Calculate summary values
+total_hours = filtered_df.shape[0]
+total_sales = filtered_df['Total Sales'].sum()
+total_transactions = filtered_df['# Transactions'].sum()
+avg_sales_per_hour = total_sales / total_hours if total_hours else 0
+avg_transactions_per_hour = total_transactions / total_hours if total_hours else 0
+
+summary_df = pd.DataFrame({
+    'Metric': [
+        'Total Hours (Filtered Rows)',
+        'Total Sales ($)',
+        'Total Transactions',
+        'Avg Sales per Hour ($)',
+        'Avg Transactions per Hour'
+    ],
+    'Value': [
+        total_hours,
+        f"${total_sales:,.2f}",
+        int(total_transactions),
+        f"${avg_sales_per_hour:,.2f}",
+        round(avg_transactions_per_hour, 2)
+    ]
+})
+
+st.table(summary_df)
+
+# Optional Download Button
 st.download_button("📥 Download Filtered Data", data=filtered_df.to_csv(index=False), file_name="filtered_data.csv")
