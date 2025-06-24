@@ -49,11 +49,24 @@ monthly_summary = filtered_df.groupby(['Year', 'Month']).agg({selected_metric: '
 fig_month = px.bar(monthly_summary, x='Month', y=selected_metric, color='Year', barmode='group', title=f"{selected_metric} by Month")
 st.plotly_chart(fig_month)
 
-# Weekly Comparison
+# Add readable week start label
+filtered_df['WeekStart'] = filtered_df['Date'] - pd.to_timedelta(filtered_df['Date'].dt.weekday, unit='D')
+filtered_df['WeekLabel'] = filtered_df['WeekStart'].dt.strftime("Week of %b %d")
+
+# Weekly Comparison with Week Labels
 st.subheader(f"📅 Weekly {selected_metric} Comparison")
-weekly_summary = filtered_df.groupby(['Year', 'Week']).agg({selected_metric: 'sum'}).reset_index()
-fig_week = px.line(weekly_summary, x='Week', y=selected_metric, color='Year', markers=True, title=f"{selected_metric} by Week")
+weekly_summary = filtered_df.groupby(['Year', 'WeekLabel']).agg({selected_metric: 'sum'}).reset_index()
+fig_week = px.line(
+    weekly_summary,
+    x='WeekLabel',
+    y=selected_metric,
+    color='Year',
+    markers=True,
+    title=f"{selected_metric} by Week"
+)
+fig_week.update_layout(xaxis_title="Week", xaxis_tickangle=45)
 st.plotly_chart(fig_week)
+
 
 # Day-of-Week Comparison (Pie Chart)
 st.subheader(f"📊 {selected_metric} by Day of Week")
