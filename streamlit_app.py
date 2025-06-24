@@ -11,7 +11,10 @@ df['Hour'] = df['Hour of Day']
 df['DayOfWeek'] = df['Date'].dt.day_name()
 df['Year'] = df['Date'].dt.year
 df['Month'] = df['Date'].dt.month_name()
-df['Week'] = df['Date'].dt.isocalendar().week
+
+# Create chronological weekly label
+df['WeekStart'] = df['Date'] - pd.to_timedelta(df['Date'].dt.weekday, unit='D')
+df['WeekLabel'] = df['WeekStart'].dt.strftime("Week of %b %d")
 
 # Sidebar Filters
 st.sidebar.header("🔍 Filter Options")
@@ -49,13 +52,10 @@ monthly_summary = filtered_df.groupby(['Year', 'Month']).agg({selected_metric: '
 fig_month = px.bar(monthly_summary, x='Month', y=selected_metric, color='Year', barmode='group', title=f"{selected_metric} by Month")
 st.plotly_chart(fig_month)
 
-# Add readable week start label
-filtered_df['WeekStart'] = filtered_df['Date'] - pd.to_timedelta(filtered_df['Date'].dt.weekday, unit='D')
-filtered_df['WeekLabel'] = filtered_df['WeekStart'].dt.strftime("Week of %b %d")
-
-# Weekly Comparison with Week Labels
+# Weekly Comparison (Chronologically Sorted)
 st.subheader(f"📅 Weekly {selected_metric} Comparison")
-weekly_summary = filtered_df.groupby(['Year', 'WeekLabel']).agg({selected_metric: 'sum'}).reset_index()
+weekly_summary = filtered_df.groupby(['Year', 'WeekStart', 'WeekLabel']).agg({selected_metric: 'sum'}).reset_index()
+weekly_summary = weekly_summary.sort_values('WeekStart')
 fig_week = px.line(
     weekly_summary,
     x='WeekLabel',
@@ -64,10 +64,8 @@ fig_week = px.line(
     markers=True,
     title=f"{selected_metric} by Week"
 )
-
 fig_week.update_layout(xaxis_title="Week", xaxis_tickangle=45)
 st.plotly_chart(fig_week)
-
 
 # Day-of-Week Comparison (Pie Chart)
 st.subheader(f"📊 {selected_metric} by Day of Week")
@@ -75,5 +73,5 @@ dow_summary = filtered_df.groupby('DayOfWeek').agg({selected_metric: 'sum'}).rei
 fig_pie = px.pie(dow_summary, names='DayOfWeek', values=selected_metric, title=f"{selected_metric} Distribution by Day")
 st.plotly_chart(fig_pie)
 
-# Optional: Download Button
+# Download Button
 st.download_button("📥 Download Filtered Data", data=filtered_df.to_csv(index=False), file_name="filtered_data.csv")
