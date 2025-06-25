@@ -103,6 +103,29 @@ fig_top_hours.update_layout(
 )
 st.plotly_chart(fig_top_hours)
 
+
+# Combined Sales and Transactions per Hour (Filtered)
+st.subheader("📈 Sales and Transactions Per Hour")
+
+hourly_summary = filtered_df.groupby('Hour').agg({
+    'Total Sales': 'sum',
+    '# Transactions': 'sum'
+}).reset_index()
+
+fig_combined = px.bar(
+    hourly_summary,
+    x='Hour',
+    y=['Total Sales', '# Transactions'],
+    barmode='group',
+    title="Sales and Transactions Per Hour (Filtered)",
+    labels={'value': 'Metric Value', 'Hour': 'Hour of Day', 'variable': 'Metric'}
+)
+
+fig_combined.update_layout(xaxis=dict(dtick=1))
+st.plotly_chart(fig_combined)
+
+
+
 # Summary Table
 st.subheader("📋 Summary of Filtered Data")
 total_hours = filtered_df.shape[0]
