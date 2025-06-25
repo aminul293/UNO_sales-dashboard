@@ -126,7 +126,7 @@ fig.add_trace(go.Bar(
     x=hourly_summary['Hour'],
     y=hourly_summary['Total Sales'],
     name='Total Sales',
-    marker_color='blue',
+    marker_color='royalblue',
     yaxis='y1'
 ))
 
