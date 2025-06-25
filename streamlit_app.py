@@ -89,11 +89,15 @@ fig_top_hours = px.bar(
     y=selected_metric,
     text=selected_metric,
     title=f"Top 5 Busiest Hours Between 8 AM – 5 PM",
-    labels={'Hour': 'Hour of Day'},
-    color='Hour',
-    color_continuous_scale='Blues'
+    labels={'Hour': 'Hour of Day'}
 )
-fig_top_hours.update_traces(texttemplate='%{text:.2s}', textposition='outside')
+fig_top_hours.update_traces(
+    texttemplate='%{text:.2s}',
+    textposition='outside',
+    marker_color='royalblue',
+    marker_line_color='black',
+    marker_line_width=1
+)
 fig_top_hours.update_layout(
     xaxis=dict(dtick=1),
     yaxis_title=selected_metric,
@@ -102,6 +106,7 @@ fig_top_hours.update_layout(
     uniformtext_mode='hide'
 )
 st.plotly_chart(fig_top_hours)
+
 # Filter to Business Hours (8 AM to 5 PM)
 business_hours_df = filtered_df[(filtered_df['Hour'] >= 8) & (filtered_df['Hour'] <= 17)]
 
