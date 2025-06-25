@@ -102,27 +102,51 @@ fig_top_hours.update_layout(
     uniformtext_mode='hide'
 )
 st.plotly_chart(fig_top_hours)
+# Filter to Business Hours (8 AM to 5 PM)
+business_hours_df = filtered_df[(filtered_df['Hour'] >= 8) & (filtered_df['Hour'] <= 17)]
 
-
-# Combined Sales and Transactions per Hour (Filtered)
-st.subheader("📈 Sales and Transactions Per Hour")
-
-hourly_summary = filtered_df.groupby('Hour').agg({
+# Group by Hour of Day
+hourly_summary = business_hours_df.groupby('Hour').agg({
     'Total Sales': 'sum',
     '# Transactions': 'sum'
 }).reset_index()
 
-fig_combined = px.bar(
-    hourly_summary,
-    x='Hour',
-    y=['Total Sales', '# Transactions'],
-    barmode='group',
-    title="Sales and Transactions Per Hour (Filtered)",
-    labels={'value': 'Metric Value', 'Hour': 'Hour of Day', 'variable': 'Metric'}
+# Bar + Line Chart using Plotly
+import plotly.graph_objects as go
+
+fig = go.Figure()
+
+# Bar for Total Sales
+fig.add_trace(go.Bar(
+    x=hourly_summary['Hour'],
+    y=hourly_summary['Total Sales'],
+    name='Total Sales',
+    marker_color='blue',
+    yaxis='y1'
+))
+
+# Line for Transactions
+fig.add_trace(go.Scatter(
+    x=hourly_summary['Hour'],
+    y=hourly_summary['# Transactions'],
+    name='# Transactions',
+    mode='lines+markers',
+    line=dict(color='red', width=3),
+    yaxis='y2'
+))
+
+# Layout settings
+fig.update_layout(
+    title="Sales and Transactions by Hour (Business Hours 8AM-5PM)",
+    xaxis=dict(title='Hour of Day'),
+    yaxis=dict(title='Total Sales', side='left'),
+    yaxis2=dict(title='# Transactions', overlaying='y', side='right'),
+    legend=dict(x=0.5, y=1.1, orientation='h', xanchor='center'),
+    bargap=0.2,
+    height=500
 )
 
-fig_combined.update_layout(xaxis=dict(dtick=1))
-st.plotly_chart(fig_combined)
+st.plotly_chart(fig)
 
 
 
