@@ -1,184 +1,208 @@
+# streamlit_app.py
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.ensemble import RandomForestRegressor
 
-# Load Data
-df = pd.read_csv("sales_data.csv")
-df['Date'] = pd.to_datetime(df['Date'], format='%m-%d-%Y')
-df['Hour'] = df['Hour of Day']
-df['DayOfWeek'] = df['Date'].dt.day_name()
-df['Year'] = df['Date'].dt.year
-df['Month'] = df['Date'].dt.month_name()
-
-# Create readable, sortable weekly label
-df['WeekStart'] = df['Date'] - pd.to_timedelta(df['Date'].dt.weekday, unit='D')
-df['WeekLabel'] = df['WeekStart'].dt.strftime("Week of %b %d")
-
-# Sidebar Filters
-st.sidebar.header("🔍 Filter Options")
-
-# Date Range Filter
-min_date, max_date = df['Date'].min(), df['Date'].max()
-date_range = st.sidebar.date_input("Select Date Range", [min_date, max_date], min_value=min_date, max_value=max_date)
-
-# Day of Week Filter
-day_list = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-selected_days = st.sidebar.multiselect("Select Day(s)", day_list, default=day_list)
-
-# Hour Filter
-hour_min, hour_max = int(df['Hour'].min()), int(df['Hour'].max())
-selected_hours = st.sidebar.slider("Select Hour Range", hour_min, hour_max, (hour_min, hour_max))
-
-# Metric Selector
-selected_metric = st.sidebar.radio("Choose Metric", ['Total Sales', '# Transactions'])
-
-# Filter Data
-filtered_df = df[
-    (df['Date'] >= pd.to_datetime(date_range[0])) &
-    (df['Date'] <= pd.to_datetime(date_range[1])) &
-    (df['DayOfWeek'].isin(selected_days)) &
-    (df['Hour'] >= selected_hours[0]) &
-    (df['Hour'] <= selected_hours[1])
-]
-
-# Dashboard Title
-st.title("📊 Enhanced UNO Sales & Operations Dashboard")
-
-# Monthly Comparison
-st.subheader(f"📆 Monthly {selected_metric} Comparison")
-monthly_summary = filtered_df.groupby(['Year', 'Month']).agg({selected_metric: 'sum'}).reset_index()
-fig_month = px.bar(monthly_summary, x='Month', y=selected_metric, color='Year', barmode='group', title=f"{selected_metric} by Month")
-st.plotly_chart(fig_month)
-
-# Weekly Comparison (Chronologically Ordered)
-st.subheader(f"📅 Weekly {selected_metric} Comparison")
-weekly_summary = filtered_df.groupby(['Year', 'WeekStart', 'WeekLabel']).agg({selected_metric: 'sum'}).reset_index()
-weekly_summary = weekly_summary.sort_values('WeekStart')
-fig_week = px.line(
-    weekly_summary,
-    x='WeekLabel',
-    y=selected_metric,
-    color='Year',
-    markers=True,
-    title=f"{selected_metric} by Week"
-)
-fig_week.update_layout(xaxis_title="Week", xaxis_tickangle=45)
-st.plotly_chart(fig_week)
-
-# Day-of-Week Comparison (Pie Chart)
-st.subheader(f"📊 {selected_metric} by Day of Week")
-dow_summary = filtered_df.groupby('DayOfWeek').agg({selected_metric: 'sum'}).reindex(day_list).reset_index()
-fig_pie = px.pie(dow_summary, names='DayOfWeek', values=selected_metric, title=f"{selected_metric} Distribution by Day")
-st.plotly_chart(fig_pie)
-
-# Top 5 Busiest Business Hours (8 AM – 5 PM)
-st.subheader(f"⏰ Top 5 Busiest Business Hours (8 AM – 5 PM) by {selected_metric}")
-business_hours_df = filtered_df[(filtered_df['Hour'] >= 8) & (filtered_df['Hour'] <= 17)]
-top_hours = (
-    business_hours_df.groupby('Hour')
-    .agg({selected_metric: 'sum'})
-    .sort_values(by=selected_metric, ascending=False)
-    .reset_index()
-    .head(5)
-)
-fig_top_hours = px.bar(
-    top_hours,
-    x='Hour',
-    y=selected_metric,
-    text=selected_metric,
-    title=f"Top 5 Busiest Hours Between 8 AM – 5 PM",
-    labels={'Hour': 'Hour of Day'}
-)
-fig_top_hours.update_traces(
-    texttemplate='%{text:.2s}',
-    textposition='outside',
-    marker_color='royalblue',
-    marker_line_color='black',
-    marker_line_width=1
-)
-fig_top_hours.update_layout(
-    xaxis=dict(dtick=1),
-    yaxis_title=selected_metric,
-    xaxis_title="Hour of Day",
-    uniformtext_minsize=8,
-    uniformtext_mode='hide'
-)
-st.plotly_chart(fig_top_hours)
-
-# Filter to Business Hours (8 AM to 5 PM)
-business_hours_df = filtered_df[(filtered_df['Hour'] >= 8) & (filtered_df['Hour'] <= 17)]
-
-# Group by Hour of Day
-hourly_summary = business_hours_df.groupby('Hour').agg({
-    'Total Sales': 'sum',
-    '# Transactions': 'sum'
-}).reset_index()
-
-# Bar + Line Chart using Plotly
-import plotly.graph_objects as go
-
-fig = go.Figure()
-
-# Bar for Total Sales
-fig.add_trace(go.Bar(
-    x=hourly_summary['Hour'],
-    y=hourly_summary['Total Sales'],
-    name='Total Sales',
-    marker_color='royalblue',
-    yaxis='y1'
-))
-
-# Line for Transactions
-fig.add_trace(go.Scatter(
-    x=hourly_summary['Hour'],
-    y=hourly_summary['# Transactions'],
-    name='# Transactions',
-    mode='lines+markers',
-    line=dict(color='red', width=3),
-    yaxis='y2'
-))
-
-# Layout settings
-fig.update_layout(
-    title="Sales and Transactions by Hour (Business Hours 8AM-5PM)",
-    xaxis=dict(title='Hour of Day'),
-    yaxis=dict(title='Total Sales', side='left'),
-    yaxis2=dict(title='# Transactions', overlaying='y', side='right'),
-    legend=dict(x=0.5, y=1.1, orientation='h', xanchor='center'),
-    bargap=0.2,
-    height=500
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="AI Operations Assistant",
+    page_icon="🤖",
+    layout="wide"
 )
 
-st.plotly_chart(fig)
+# --- Helper Functions ---
 
+@st.cache_data
+def load_and_prepare_data(uploaded_csv):
+    """
+    Loads data from a CSV file, cleans it, and prepares it for analysis.
+    This version is specifically for the 'sales_data.csv' format.
+    """
+    try:
+        df = pd.read_csv(uploaded_csv)
+        # --- Data Cleaning and Transformation ---
+        # 1. Standardize column names
+        df.columns = df.columns.str.lower().str.replace(' ', '_').str.replace('#','num')
+        
+        # 2. Create a proper datetime index from 'date' and 'hour_of_day'
+        df['datetime'] = pd.to_datetime(df['date'] + ' ' + df['hour_of_day'].astype(str) + ':00', format='%m-%d-%Y %H:%M')
+        df.set_index('datetime', inplace=True)
 
+        # 3. Rename columns to match the rest of the app's logic
+        df.rename(columns={
+            'num_transactions': 'transaction_id',
+            'total_sales': 'sales_amount'
+        }, inplace=True)
+        
+        # 4. Ensure data types are correct
+        df['transaction_id'] = pd.to_numeric(df['transaction_id'], errors='coerce').fillna(0)
+        df['sales_amount'] = pd.to_numeric(df['sales_amount'], errors='coerce').fillna(0)
 
-# Summary Table
-st.subheader("📋 Summary of Filtered Data")
-total_hours = filtered_df.shape[0]
-total_sales = filtered_df['Total Sales'].sum()
-total_transactions = filtered_df['# Transactions'].sum()
-avg_sales_per_hour = total_sales / total_hours if total_hours else 0
-avg_transactions_per_hour = total_transactions / total_hours if total_hours else 0
-summary_df = pd.DataFrame({
-    'Metric': [
-        'Total Hours (Filtered Rows)',
-        'Total Sales ($)',
-        'Total Transactions',
-        'Avg Sales per Hour ($)',
-        'Avg Transactions per Hour'
-    ],
-    'Value': [
-        total_hours,
-        f"${total_sales:,.2f}",
-        int(total_transactions),
-        f"${avg_sales_per_hour:,.2f}",
-        round(avg_transactions_per_hour, 2)
-    ]
-})
-st.table(summary_df)
+        # 5. Remove rows where there are no sales or transactions to avoid noise
+        df = df[df['sales_amount'] > 0]
+        
+        # Create a dictionary to hold the data, for consistency
+        data_dict = {'sales': df}
+        return data_dict
 
-# Download Button
-st.download_button("📥 Download Filtered Data", data=filtered_df.to_csv(index=False), file_name="filtered_data.csv")
+    except Exception as e:
+        st.error(f"Failed to process CSV file. Please check the format. Error: {e}")
+        return None
+
+# The rest of the functions (predict_staffing, generate_shift_plan, etc.)
+# remain the same as they operate on the cleaned dataframe.
+@st.cache_data
+def predict_staffing(df, transactions_per_staff=20):
+    df_resampled = df['transaction_id'].resample('H').sum().fillna(0).reset_index()
+    df_resampled.columns = ['datetime', 'transactions']
+    df_resampled['hour'] = df_resampled['datetime'].dt.hour
+    df_resampled['day_of_week'] = df_resampled['datetime'].dt.dayofweek
+    df_resampled['month'] = df_resampled['datetime'].dt.month
+    
+    X = df_resampled[['hour', 'day_of_week', 'month']]
+    y = df_resampled['transactions']
+    
+    model = RandomForestRegressor(n_estimators=100, random_state=42, min_samples_leaf=3)
+    model.fit(X, y)
+    
+    future_dates = pd.date_range(start='2023-01-02', end='2023-01-09', freq='H', inclusive='left')
+    future_df = pd.DataFrame({'datetime': future_dates})
+    future_df['hour'] = future_df['datetime'].dt.hour
+    future_df['day_of_week'] = future_df['datetime'].dt.dayofweek
+    future_df['month'] = future_df['datetime'].dt.month
+    
+    predictions = model.predict(future_df[['hour', 'day_of_week', 'month']])
+    future_df['predicted_transactions'] = predictions.round()
+    future_df['recommended_staff'] = (future_df['predicted_transactions'] / transactions_per_staff).apply(lambda x: max(1, round(x)))
+    
+    return future_df
+
+@st.cache_data
+def generate_shift_plan(forecast_df):
+    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    plan = {}
+    forecast_df['day_name'] = forecast_df['datetime'].dt.day_name()
+    for day_name, group in forecast_df.groupby('day_name'):
+        morning_shift = group[(group['hour'] >= 8) & (group['hour'] < 12)]
+        midday_shift = group[(group['hour'] >= 12) & (group['hour'] < 17)]
+        closing_shift = group[(group['hour'] >= 17) & (group['hour'] < 22)]
+        plan[day_name] = {
+            "Morning (8am-12pm)": int(morning_shift['recommended_staff'].max()) if not morning_shift.empty else 0,
+            "Midday (12pm-5pm)": int(midday_shift['recommended_staff'].max()) if not midday_shift.empty else 0,
+            "Closing (5pm-10pm)": int(closing_shift['recommended_staff'].max()) if not closing_shift.empty else 0,
+        }
+    plan_df = pd.DataFrame.from_dict(plan, orient='index')
+    return plan_df.reindex(day_order).fillna(0).astype(int)
+
+@st.cache_data
+def convert_df_to_csv(df):
+   return df.to_csv().encode('utf-8')
+
+# --- Main Application UI ---
+st.title("🤖 AI-Powered Operations & Staffing Assistant")
+st.markdown("This tool helps you analyze sales data, predict staffing needs, and make smarter business decisions. **Start by uploading your `sales_data.csv` file.**")
+
+with st.sidebar:
+    st.header("⚙️ Controls")
+    uploaded_file = st.file_uploader("Upload Your Sales CSV File", type="csv")
+    
+    if 'data' in st.session_state:
+        st.header("Model Parameters")
+        transactions_per_staff_member = st.slider(
+            "Transactions 1 Staff Can Handle/Hour", 
+            min_value=5, max_value=50, value=20, step=1,
+            help="Adjust this to reflect your staff's efficiency."
+        )
+
+if uploaded_file is not None:
+    if 'data' not in st.session_state or st.session_state.get('file_id') != uploaded_file.id:
+        with st.spinner('Analyzing your data... This may take a moment.'):
+            data_dict = load_and_prepare_data(uploaded_file)
+            if data_dict and 'sales' in data_dict:
+                st.session_state['data'] = data_dict
+                st.session_state['file_id'] = uploaded_file.id
+                st.success("Data processed successfully!")
+            else:
+                st.stop()
+
+if 'data' in st.session_state:
+    sales_df = st.session_state['data']['sales']
+    
+    st.header("📊 Sales & Transaction Analysis")
+    st.markdown("Understand your business's performance patterns.")
+    tab1, tab2, tab3 = st.tabs(["**① Hourly Trends**", "**② Day of Week Analysis**", "**③ Monthly Comparison**"])
+
+    with tab1:
+        st.subheader("Average Hourly Performance")
+        hourly_analysis = sales_df.groupby(sales_df.index.hour).agg(
+            total_sales=('sales_amount', 'sum'),
+            total_transactions=('transaction_id', 'sum') # Use sum because data is already aggregated
+        ).rename_axis('hour')
+        
+        num_days = sales_df.index.normalize().nunique()
+        hourly_analysis['avg_sales_per_hour'] = hourly_analysis['total_sales'] / num_days
+        hourly_analysis['avg_transactions_per_hour'] = hourly_analysis['total_transactions'] / num_days
+        
+        peak_trans_hour = hourly_analysis['avg_transactions_per_hour'].idxmax()
+        col1, col2 = st.columns(2)
+        col1.metric("Peak Transaction Hour", f"{peak_trans_hour}:00 - {peak_trans_hour+1}:00", "Busiest for customers")
+        
+        fig_hourly = px.bar(hourly_analysis, y=['avg_sales_per_hour', 'avg_transactions_per_hour'],
+                             barmode='group', title="Average Sales and Transactions per Hour of the Day")
+        st.plotly_chart(fig_hourly, use_container_width=True)
+
+    with tab2:
+        st.subheader("Performance by Day of the Week")
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        day_analysis = sales_df.groupby(sales_df.index.day_name()).agg(
+            total_transactions=('transaction_id', 'sum')
+        ).reindex(day_order)
+
+        busiest_day = day_analysis['total_transactions'].idxmax()
+        st.metric("Busiest Day of the Week", busiest_day)
+        
+        fig_day = px.bar(day_analysis, y='total_transactions', title="Total Transactions by Day of Week")
+        st.plotly_chart(fig_day, use_container_width=True)
+
+    with tab3:
+        st.subheader("Month-over-Month Performance")
+        monthly_analysis = sales_df.resample('M').agg(
+            total_sales=('sales_amount', 'sum'),
+            total_transactions=('transaction_id', 'sum')
+        )
+        monthly_analysis.index = monthly_analysis.index.strftime('%Y-%B')
+        
+        fig_monthly = px.line(monthly_analysis, y=['total_sales', 'total_transactions'],
+                               title="Monthly Sales and Transaction Trends", markers=True)
+        st.plotly_chart(fig_monthly, use_container_width=True)
+
+    st.header("🚀 Workforce & Scheduling Recommendations")
+    st.markdown("Use machine learning to forecast demand and create optimal schedules.")
+    staff_tab1, staff_tab2 = st.tabs(["**① Staffing Forecast**", "**② Shift & Hours Plan**"])
+
+    with staff_tab1:
+        st.subheader("AI-Powered Staffing Forecast")
+        st.write("This forecast predicts hourly transaction volume for a typical week and recommends staff needed.")
+        with st.spinner("Training model and generating forecast..."):
+            forecast_df = predict_staffing(sales_df, transactions_per_staff_member)
+        fig_forecast = px.line(forecast_df, x='datetime', y='recommended_staff',
+                       title="Recommended Staff per Hour for a Typical Week")
+        st.plotly_chart(fig_forecast, use_container_width=True)
+
+    with staff_tab2:
+        st.subheader("Recommended Weekly Shift Plan")
+        shift_plan_df = generate_shift_plan(forecast_df)
+        st.dataframe(shift_plan_df)
+        
+        csv_export = convert_df_to_csv(shift_plan_df)
+        st.download_button(
+           label="📥 Download Shift Plan as CSV",
+           data=csv_export,
+           file_name='recommended_shift_plan.csv',
+           mime='text/csv',
+        )
+
+else:
+    st.info("Awaiting your data... Please upload your CSV file using the sidebar to begin.")
