@@ -1,4 +1,4 @@
-# streamlit_app.py
+# streamlit_app.py (Corrected Version)
 
 import streamlit as st
 import pandas as pd
@@ -51,8 +51,6 @@ def load_and_prepare_data(uploaded_csv):
         st.error(f"Failed to process CSV file. Please check the format. Error: {e}")
         return None
 
-# The rest of the functions (predict_staffing, generate_shift_plan, etc.)
-# remain the same as they operate on the cleaned dataframe.
 @st.cache_data
 def predict_staffing(df, transactions_per_staff=20):
     df_resampled = df['transaction_id'].resample('H').sum().fillna(0).reset_index()
@@ -116,17 +114,30 @@ with st.sidebar:
             help="Adjust this to reflect your staff's efficiency."
         )
 
+# --- This is the corrected block ---
 if uploaded_file is not None:
-    if 'data' not in st.session_state or st.session_state.get('file_id') != uploaded_file.id:
+    # Create a unique identifier from the file's name and size
+    file_identifier = uploaded_file.name + str(uploaded_file.size)
+    
+    # Check if the file is new or different from the one already in memory
+    if 'data' not in st.session_state or st.session_state.get('file_id') != file_identifier:
         with st.spinner('Analyzing your data... This may take a moment.'):
             data_dict = load_and_prepare_data(uploaded_file)
             if data_dict and 'sales' in data_dict:
                 st.session_state['data'] = data_dict
-                st.session_state['file_id'] = uploaded_file.id
+                # Store our new, reliable identifier in the session state
+                st.session_state['file_id'] = file_identifier 
                 st.success("Data processed successfully!")
             else:
+                # This part is a safety net in case the upload fails processing
+                if 'data' in st.session_state:
+                    del st.session_state['data']
+                if 'file_id' in st.session_state:
+                    del st.session_state['file_id']
+                st.error("Could not process the uploaded file. Please check its format and content.")
                 st.stop()
 
+# --- The rest of the app logic ---
 if 'data' in st.session_state:
     sales_df = st.session_state['data']['sales']
     
