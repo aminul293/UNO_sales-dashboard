@@ -1,9 +1,8 @@
 import pandas as pd
 import streamlit as st
 import plotly.express as px
-import plotly.graph_objects as go  # --- CHANGE ---: Import graph_objects for dual-axis chart
+import plotly.graph_objects as go
 from xgboost import XGBRegressor
-from sklearn.model_selection import train_test_split
 
 # --- Page Configuration (Best Practice) ---
 st.set_page_config(
@@ -13,8 +12,6 @@ st.set_page_config(
 )
 
 # --- Caching Functions for Performance ---
-
-# --- CHANGE 1: Cache the data loading ---
 @st.cache_data
 def load_data(path):
     """Loads and preprocesses the sales data."""
@@ -31,12 +28,10 @@ def load_data(path):
     df['WeekLabel'] = df['WeekStart'].dt.strftime('%b %d')
     return df
 
-# --- CHANGE 2: Cache the model training ---
 @st.cache_resource
 def train_model(df):
     """Trains the XGBoost regression model."""
     st.info("🤖 Training forecasting model... (This runs only once)")
-    # --- CHANGE 5: Improved feature set ---
     features = ['Hour', 'DayNum', 'MonthNum', 'Year', 'Week']
     target = 'Total Sales'
     
@@ -44,12 +39,10 @@ def train_model(df):
     y = df[target]
     
     model = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)
-    model.fit(X, y) # Train on the entire dataset for forecasting
+    model.fit(X, y)
     return model
 
 # --- Main App Logic ---
-
-# Load data and train model
 df = load_data("sales_data.csv")
 model = train_model(df)
 
@@ -58,11 +51,9 @@ st.sidebar.header("🔍 Filter Options")
 day_list = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 date_range = st.sidebar.date_input("Select Date Range", [df['Date'].min(), df['Date'].max()])
 selected_days = st.sidebar.multiselect("Select Day(s)", day_list, default=day_list)
-hour_range = st.sidebar.slider("Select Hour Range", 0, 23, (8, 17)) # Use full 24h range for slider
+hour_range = st.sidebar.slider("Select Hour Range", 0, 23, (8, 17))
 selected_metric = st.sidebar.radio("Choose Metric", ['Total Sales', '# Transactions'])
 
-# Apply filters
-# Handle potential empty date_range
 if not date_range or len(date_range) != 2:
     st.warning("Please select a valid date range.")
     st.stop()
@@ -78,10 +69,9 @@ if filtered_df.empty:
     st.warning("No data available for the selected filters. Please adjust your selection.")
     st.stop()
 
-# Title
 st.title("📊 UNO Sales Dashboard & Forecasting")
 
-# --- CHANGE 3: Interactive dual-axis chart with Plotly ---
+# --- Interactive dual-axis chart with Plotly (CORRECTED) ---
 st.subheader("📅 Daily Trends: Sales vs Transactions")
 daily_summary = filtered_df.groupby('Date').agg({
     'Total Sales': 'sum',
@@ -89,47 +79,27 @@ daily_summary = filtered_df.groupby('Date').agg({
 }).reset_index()
 
 fig_daily = go.Figure()
-# Add Total Sales trace
 fig_daily.add_trace(go.Scatter(
-    x=daily_summary['Date'],
-    y=daily_summary['Total Sales'],
-    name='Total Sales',
-    line=dict(color='green'),
-    yaxis='y1'
+    x=daily_summary['Date'], y=daily_summary['Total Sales'], name='Total Sales',
+    line=dict(color='green'), yaxis='y1'
 ))
-# Add # Transactions trace
 fig_daily.add_trace(go.Scatter(
-    x=daily_summary['Date'],
-    y=daily_summary['# Transactions'],
-    name='# Transactions',
-    line=dict(color='red', dash='dash'),
-    yaxis='y2'
+    x=daily_summary['Date'], y=daily_summary['# Transactions'], name='# Transactions',
+    line=dict(color='red', dash='dash'), yaxis='y2'
 ))
-# Update layout for dual axes
 fig_daily.update_layout(
     title_text="Daily Sales and Transactions",
-    xaxis_title="Date",
-    yaxis=dict(
-        title="Total Sales ($)",
-        titlefont=dict(color="green"),
-        tickfont=dict(color="green")
-    ),
-    yaxis2=dict(
-        title="# Transactions",
-        titlefont=dict(color="red"),
-        tickfont=dict(color="red"),
-        overlaying='y',
-        side='right'
-    ),
-    legend=dict(x=0, y=1.1, orientation="h")
+    xaxis=dict(title="Date"),
+    yaxis=dict(title="Total Sales ($)", titlefont=dict(color="green"), tickfont=dict(color="green")),
+    yaxis2=dict(title="# Transactions", titlefont=dict(color="red"), tickfont=dict(color="red"), overlaying='y', side='right'),
+    legend=dict(x=0, y=1.1, orientation="h"),
+    hovermode="x unified"
 )
 st.plotly_chart(fig_daily, use_container_width=True)
 
-
-# Weekly sales (Chronological)
+# Weekly sales
 st.subheader("📆 Weekly Total Sales")
-weekly_summary = filtered_df.groupby(['Year', 'WeekStart', 'WeekLabel']).agg({'Total Sales': 'sum'}).reset_index()
-weekly_summary = weekly_summary.sort_values('WeekStart')
+weekly_summary = filtered_df.groupby(['Year', 'WeekStart', 'WeekLabel']).agg({'Total Sales': 'sum'}).reset_index().sort_values('WeekStart')
 fig_week = px.line(weekly_summary, x='WeekLabel', y='Total Sales', color='Year', markers=True, title="Total Sales by Week")
 fig_week.update_layout(xaxis_title="Week Start Date", xaxis_tickangle=45)
 st.plotly_chart(fig_week, use_container_width=True)
@@ -150,51 +120,39 @@ with col2:
     fig_dow = px.bar(dow_summary, x='DayOfWeek', y='Total Sales', title='Total Sales by Day')
     st.plotly_chart(fig_dow, use_container_width=True)
 
-
 # Busiest hours
 st.subheader(f"⏰ Top 5 Busiest Hours by {selected_metric}")
 business_hours_df = filtered_df[filtered_df['Hour'].between(hour_range[0], hour_range[1])]
 top_hours = business_hours_df.groupby('Hour')[selected_metric].sum().nlargest(5).reset_index()
 fig_top_hours = px.bar(top_hours, x='Hour', y=selected_metric, text=selected_metric, color=selected_metric, color_continuous_scale='Blues')
 fig_top_hours.update_traces(texttemplate='%{text:,.0f}', textposition='outside')
-fig_top_hours.update_layout(xaxis=dict(type='category')) # Treat hours as categories
+fig_top_hours.update_layout(xaxis=dict(type='category'))
 st.plotly_chart(fig_top_hours, use_container_width=True)
 
-
-# --- CHANGE 4: Clearer Forecasting Visualization ---
+# Forecasting
 st.header("📈 Predict Future Daily Sales (Next 7 Days)")
 with st.spinner("Generating forecast..."):
     future_dates = pd.to_datetime(pd.date_range(df['Date'].max() + pd.Timedelta(days=1), periods=7, freq='D'))
     future_rows = []
     for date in future_dates:
-        for hour in range(hour_range[0], hour_range[1] + 1): # Business hours
+        for hour in range(hour_range[0], hour_range[1] + 1):
             future_rows.append({
-                'Hour': hour,
-                'DayNum': date.weekday(),
-                'MonthNum': date.month,
-                'Year': date.year,
-                'Week': date.isocalendar().week,
-                'Date': date # Keep date for aggregation
+                'Hour': hour, 'DayNum': date.weekday(), 'MonthNum': date.month,
+                'Year': date.year, 'Week': date.isocalendar().week, 'Date': date
             })
     future_df = pd.DataFrame(future_rows)
     
-    # Predict using the required features
     pred_features = ['Hour', 'DayNum', 'MonthNum', 'Year', 'Week']
     future_df['Predicted Sales'] = model.predict(future_df[pred_features]).round(2)
     
-    # Aggregate to daily forecast for a cleaner plot
     daily_forecast = future_df.groupby('Date')['Predicted Sales'].sum().reset_index()
-    
-    # Combine with historical data for context
-    historical_summary = df.groupby('Date')['Total Sales'].sum().reset_index().tail(21) # Last 3 weeks
+    historical_summary = df.groupby('Date')['Total Sales'].sum().reset_index().tail(21)
     
     fig_forecast = go.Figure()
     fig_forecast.add_trace(go.Scatter(x=historical_summary['Date'], y=historical_summary['Total Sales'], mode='lines', name='Historical Daily Sales'))
     fig_forecast.add_trace(go.Scatter(x=daily_forecast['Date'], y=daily_forecast['Predicted Sales'], mode='lines+markers', name='Forecasted Daily Sales', line=dict(dash='dot', color='red')))
-    
     fig_forecast.update_layout(title="Historical vs. Forecasted Daily Sales", xaxis_title="Date", yaxis_title="Total Sales ($)")
     st.plotly_chart(fig_forecast, use_container_width=True)
-
 
 # Summary Table
 st.subheader("📋 Summary of Filtered Data")
@@ -206,9 +164,7 @@ if not filtered_df.empty:
     summary_df = pd.DataFrame({
         'Metric': ['Total Filtered Hours', 'Total Sales ($)', 'Total Transactions', 'Avg Sales per Hour ($)', 'Avg Transactions per Hour'],
         'Value': [
-            f"{total_hours:,}",
-            f"${total_sales_val:,.2f}",
-            f"{total_txns_val:,.0f}",
+            f"{total_hours:,}", f"${total_sales_val:,.2f}", f"{total_txns_val:,.0f}",
             f"${total_sales_val / total_hours:,.2f}" if total_hours > 0 else "$0.00",
             f"{total_txns_val / total_hours:,.2f}" if total_hours > 0 else "0.00"
         ]
