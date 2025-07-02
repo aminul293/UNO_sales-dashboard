@@ -65,8 +65,8 @@ st.plotly_chart(fig_week)
 
 # --- Monthly Sales ---
 st.subheader("📅 Monthly Sales")
-month_order = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
-               'September', 'October', 'November', 'December']
+month_order = ['January', 'February', 'March', 'April', 'May', 'June',
+               'July', 'August', 'September', 'October', 'November', 'December']
 filtered_df['Month'] = pd.Categorical(filtered_df['Month'], categories=month_order, ordered=True)
 monthly_summary = filtered_df.groupby(['Year', 'Month']).agg({'Total Sales': 'sum'}).reset_index()
 monthly_summary = monthly_summary.sort_values(['Year', 'Month'])
@@ -124,15 +124,17 @@ fig_top_hours.update_traces(texttemplate='%{text:.2s}', textposition='outside')
 fig_top_hours.update_layout(xaxis=dict(dtick=1), yaxis_title=selected_metric, xaxis_title="Hour of Day")
 st.plotly_chart(fig_top_hours)
 
-# --- ML Forecasting ---
+# --- Forecasting ---
 st.header("📈 Predict Future Hourly Sales (Next 7 Days)")
+
+# Train model
 X = df[['Hour', 'DayNum', 'MonthNum']]
 y = df['Total Sales']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 model = XGBRegressor(n_estimators=100, learning_rate=0.1, random_state=42)
 model.fit(X_train, y_train)
 
-# Create future days
+# Simulate next 7 days
 future_dates = pd.date_range(df['Date'].max() + pd.Timedelta(days=1), periods=7, freq='D')
 future_rows = []
 for date in future_dates:
@@ -145,22 +147,26 @@ for date in future_dates:
         })
 future_df = pd.DataFrame(future_rows)
 future_df['Predicted Sales'] = model.predict(future_df[['Hour', 'DayNum', 'MonthNum']]).round(2)
+future_df['DateLabel'] = future_df['Date'].dt.strftime('%A, %b %d')
 
-# Forecast: daily separation
-st.subheader("📅 Forecasted Sales by Day")
-for date in future_df['Date'].dt.strftime('%b %d, %Y').unique():
-    day_df = future_df[future_df['Date'].dt.strftime('%b %d, %Y') == date]
-    fig_day = px.line(
-        day_df,
-        x='Hour',
-        y='Predicted Sales',
-        markers=True,
-        title=f"📈 Sales Forecast for {date}",
-        labels={'Hour': 'Hour of Day', 'Predicted Sales': 'Sales ($)'},
-        color_discrete_sequence=['#EF553B']
-    )
-    fig_day.update_layout(xaxis=dict(dtick=1))
-    st.plotly_chart(fig_day)
+# Sidebar Forecast Viewer
+st.sidebar.header("📅 Forecast Viewer")
+forecast_days = future_df['DateLabel'].unique().tolist()
+selected_day = st.sidebar.selectbox("Select a Forecast Day", forecast_days)
+
+# Plot selected forecast
+selected_day_df = future_df[future_df['DateLabel'] == selected_day]
+fig_day = px.line(
+    selected_day_df,
+    x='Hour',
+    y='Predicted Sales',
+    markers=True,
+    title=f"Hourly Sales Forecast: {selected_day}",
+    labels={'Hour': 'Hour of Day', 'Predicted Sales': 'Sales ($)'},
+    color_discrete_sequence=['#EF553B']
+)
+fig_day.update_layout(xaxis=dict(dtick=1))
+st.plotly_chart(fig_day)
 
 # --- Summary Table ---
 st.subheader("📋 Summary of Filtered Data")
